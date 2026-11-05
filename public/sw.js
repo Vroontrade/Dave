@@ -1,5 +1,5 @@
 // FINANCIAL RESET service worker: app-shell offline beschikbaar. Je gegevens staan in localStorage, niet in deze cache.
-// Eén cache per versie (map), zodat de versie van Dave en die van zijn vriendin elkaars cache nooit wissen.
+// Eén cache per versie (map), zodat de versie van Dave en die van Sophie elkaars cache nooit wissen.
 const SCOPE = self.registration.scope
 const CACHE = 'finance-v3:' + SCOPE
 self.addEventListener('install', (e) => {

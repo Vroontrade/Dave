@@ -30,3 +30,9 @@ node e2e/run.cjs <map> # browsertest op iPhone-formaat (vereist `npx vite previe
 
 ## Mogelijke uitbreiding
 AI-assistent: alleen via een eigen server-functie (bijv. Cloudflare Worker) zodat er nooit een API-sleutel in de frontend staat.
+
+## Versie voor Sophie
+`npm run build` maakt ook `dist/sophie/` (live op https://vroontrade.github.io/Dave/sophie/).
+Die versie heeft een eigen opslagsleutel (`finance-sophie`), een eigen offline-cache en heet "Finance Sophie".
+Ze start leeg met het instelscherm; er staan geen bedragen in de code.
+Nog een versie toevoegen: extra regel in het `build`-script met `STORAGE_PREFIX=finance-<naam> OWNER=<Naam> vite build --outDir dist/<naam>`.

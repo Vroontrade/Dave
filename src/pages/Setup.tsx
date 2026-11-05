@@ -72,7 +72,7 @@ export function Setup() {
 
   return (
     <div className="flex flex-col gap-7 pb-10">
-      <PageHeader eyebrow="Welkom bij Finance" title="Stel je maandplan in" />
+      <PageHeader eyebrow={__OWNER__ ? `Welkom, ${__OWNER__}` : "Welkom bij Finance"} title="Stel je maandplan in" />
       <p className="px-1 text-[15px] text-muted">Dit doe je één keer. Je bedragen worden alleen op dit apparaat bewaard en kun je later altijd aanpassen in Instellingen.</p>
 
       <Section title="Inkomen">
