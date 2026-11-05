@@ -33,7 +33,7 @@ function useNotifications() {
     if (!ready || !data.settings.notificationsEnabled || typeof Notification === 'undefined' || Notification.permission !== 'granted') return
     const run = async () => {
       let seen: string[] = []
-      try { seen = JSON.parse(localStorage.getItem('financial-reset:notified') || '[]') } catch { /* leeg */ }
+      try { seen = JSON.parse(localStorage.getItem(`${__STORAGE_PREFIX__}:notified`) || '[]') } catch { /* leeg */ }
       const fresh = dueReminders(data).filter((r) => !seen.includes(r.key))
       if (!fresh.length) return
       try {
@@ -42,7 +42,7 @@ function useNotifications() {
           if (reg) await reg.showNotification(r.title, { body: r.body, tag: r.key, icon: './icon-192.png' })
           else new Notification(r.title, { body: r.body, tag: r.key })
         }
-        localStorage.setItem('financial-reset:notified', JSON.stringify([...seen, ...fresh.map((r) => r.key)].slice(-200)))
+        localStorage.setItem(`${__STORAGE_PREFIX__}:notified`, JSON.stringify([...seen, ...fresh.map((r) => r.key)].slice(-200)))
       } catch { /* meldingen niet beschikbaar; de banner op het dashboard blijft werken */ }
     }
     void run()
