@@ -68,3 +68,20 @@ h1, h2, h3 { text-wrap: balance; }
 .check:active { transform: scale(.92); }
 .scroll-x { overflow-x: auto; scrollbar-width: none; }
 .scroll-x::-webkit-scrollbar { display: none; }
+
+/* Palet "mokka" (versie van Sophie): zelfde stijl, groene accenten vervangen door mokkabruin.
+ * Wordt aangezet met PALETTE=mokka bij het bouwen (zet data-palette op <html>). */
+:root[data-palette="mokka"] {
+  --accent: #3A2A22; --accent-ink: #F7F5F2;
+  --success: #86593A; --success-soft: rgba(134, 89, 58, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-palette="mokka"]:not([data-theme="light"]) {
+    --bg: #151210; --surface: #1D1916; --sunken: #27221E; --ink: #EEE9E4; --accent: #E8DDD3; --accent-ink: #1A1512;
+    --muted: #A09890; --line: rgba(238, 233, 228, 0.09); --success: #C9A07E; --success-soft: rgba(201, 160, 126, 0.15);
+  }
+}
+:root[data-palette="mokka"][data-theme="dark"] {
+  --bg: #151210; --surface: #1D1916; --sunken: #27221E; --ink: #EEE9E4; --accent: #E8DDD3; --accent-ink: #1A1512;
+  --muted: #A09890; --line: rgba(238, 233, 228, 0.09); --success: #C9A07E; --success-soft: rgba(201, 160, 126, 0.15);
+}
