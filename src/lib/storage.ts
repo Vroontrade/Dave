@@ -9,8 +9,8 @@ import { currentMonth, todayISO } from './dates'
  *    los wordt gehost (GitHub Pages).
  * 3. Elke dag een automatische lokale back-up (laatste 14 dagen), plus JSON/CSV-export. */
 
-const LOCAL_KEY = 'financial-reset:v1'
-const BACKUP_PREFIX = 'financial-reset:backup:'
+const LOCAL_KEY = `${__STORAGE_PREFIX__}:v1`
+const BACKUP_PREFIX = `${__STORAGE_PREFIX__}:backup:`
 const KEEP_BACKUPS = 14
 
 export type StorageMode = 'cloud' | 'local' | 'memory'
