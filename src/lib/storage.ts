@@ -179,6 +179,38 @@ export function exportJSON(data: AppData): string {
   return JSON.stringify({ app: 'Finance', exportedAt: new Date().toISOString(), data }, null, 2)
 }
 
+/* Herstellink: je gegevens als code achter # in de link (…/#herstel=CODE).
+ * Het deel na # wordt nooit naar de server gestuurd en staat dus niet in de repo of op GitHub. */
+export const RESTORE_KEY = 'herstel='
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+export function encodeRestore(d: AppData): string {
+  // UTF-8-bytes → base64url, zonder afhankelijk te zijn van btoa
+  const bin = unescape(encodeURIComponent(JSON.stringify(d)))
+  let out = ''
+  for (let i = 0; i < bin.length; i += 3) {
+    const n = (bin.charCodeAt(i) << 16) | ((bin.charCodeAt(i + 1) || 0) << 8) | (bin.charCodeAt(i + 2) || 0)
+    out += B64[(n >> 18) & 63] + B64[(n >> 12) & 63] + (i + 1 < bin.length ? B64[(n >> 6) & 63] : '') + (i + 2 < bin.length ? B64[n & 63] : '')
+  }
+  return out
+}
+/** Leest een herstellink of losse herstelcode. Geeft null als er geen code in staat; gooit bij een kapotte code. */
+export function decodeRestore(text: string): AppData | null {
+  const i = text.indexOf(RESTORE_KEY)
+  const code = (i >= 0 ? text.slice(i + RESTORE_KEY.length) : text).trim().split(/[\s&#]/)[0]
+  if (!code || !/^[A-Za-z0-9_-]+$/.test(code) || (i < 0 && code.length < 40)) return null
+  try {
+    let bin = ''
+    for (let j = 0; j < code.length; j += 4) {
+      const v = [0, 1, 2, 3].map((k) => (j + k < code.length ? B64.indexOf(code[j + k]) : 0))
+      const n = (v[0] << 18) | (v[1] << 12) | (v[2] << 6) | v[3]
+      bin += String.fromCharCode((n >> 16) & 255)
+      if (j + 2 < code.length) bin += String.fromCharCode((n >> 8) & 255)
+      if (j + 3 < code.length) bin += String.fromCharCode(n & 255)
+    }
+    return importJSON(decodeURIComponent(escape(bin)))
+  } catch { throw new Error('Deze herstellink is niet compleet. Kopieer de hele link opnieuw.') }
+}
+
 export function importJSON(text: string): AppData {
   let parsed: unknown
   try { parsed = JSON.parse(text) } catch { throw new Error('Dit bestand is geen geldige back-up (geen JSON).') }

@@ -10,6 +10,7 @@ import { Assistant } from './components/Assistant'
 import { Setup } from './pages/Setup'
 import { Toasts } from './components/ui'
 import { dueReminders } from './lib/reminders'
+import { RESTORE_KEY, decodeRestore } from './lib/storage'
 
 export type Tab = 'vandaag' | 'dashboard' | 'maand' | 'sparen' | 'transacties' | 'instellingen'
 /** Het tabblad Vandaag (dagelijks plan) hoort alleen bij de versie van Dave, niet bij versies met een OWNER (zoals Sophie). */
@@ -58,11 +59,28 @@ function useNotifications() {
   }, [data, ready])
 }
 
+/** Opent iemand een herstellink (…/#herstel=CODE), dan zet de app dat plan terug, maar alleen als er nog geen eigen plan staat. */
+function useRestoreLink() {
+  const { ready, data, replaceAll, toast } = useStore()
+  useEffect(() => {
+    if (!ready || typeof location === 'undefined' || !location.hash.includes(RESTORE_KEY)) return
+    const hash = location.hash
+    try { history.replaceState(null, '', location.pathname + location.search + '#' + HOME) } catch { /* laat staan */ }
+    try {
+      const d = decodeRestore(hash)
+      if (!d) return
+      if (data.settings.setupDone !== false) { toast('Je app heeft al een plan. Terugzetten kan via Instellingen.'); return }
+      void replaceAll({ ...d, settings: { ...d.settings, setupDone: true } }).then((ok) => toast(ok ? 'Je plan is teruggezet' : 'Terugzetten mislukt', ok ? 'ok' : 'error'))
+    } catch (e) { toast((e as Error).message, 'error') }
+  }, [ready]) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 function Shell() {
   const [tab, setTab] = useState<Tab>(readHash)
   const [assistant, setAssistant] = useState(false)
   const { ready, mode, syncing, data } = useStore()
   useNotifications()
+  useRestoreLink()
 
   useEffect(() => {
     const on = () => setTab(readHash())

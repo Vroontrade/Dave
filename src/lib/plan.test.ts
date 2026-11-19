@@ -71,3 +71,17 @@ describe('Persoonlijk plan', () => {
     expect(isValidPlan({ v: 2 })).toBe(false)
   })
 })
+
+import { encodeRestore, decodeRestore } from './storage'
+import { emptyData } from './defaults'
+describe('Herstellink', () => {
+  it('codeert en leest een plan terug, ook met accenten', () => {
+    const d = emptyData(new Date(2027, 0, 1))
+    d.settings.items[0].name = 'Salaris € café'
+    d.settings.setupDone = true
+    const link = 'https://example.org/Dave/#herstel=' + encodeRestore(d)
+    expect(decodeRestore(link)!.settings.items[0].name).toBe('Salaris € café')
+    expect(decodeRestore('geen code hier!')).toBeNull()
+    expect(() => decodeRestore('#herstel=abc')).toThrow()
+  })
+})
