@@ -6,7 +6,7 @@ import { planTotals } from '../lib/calc'
 import { ensureMonth, uid, updateSettings } from '../lib/actions'
 import { item, suggestAliases } from '../lib/defaults'
 import { currentMonth, isValidISODate } from '../lib/dates'
-import { importJSON } from '../lib/storage'
+import { decodeRestore, importJSON } from '../lib/storage'
 import { Button, Field, PageHeader, Section, inputCls } from '../components/ui'
 
 interface Row { id: string; name: string; amount: string; kind: Extract<ItemKind, 'bill' | 'budget'> }
@@ -56,6 +56,16 @@ export function Setup() {
     await commit((d) => ensureMonth(updateSettings(d, { ...d.settings, items, goal: { target: tgt ?? 0, stretch: str || tgt || 0, targetDate: date }, setupDone: true }, { applyFrom: currentMonth() }), currentMonth()), { success: 'Je plan staat klaar' })
   }
 
+  const [link, setLink] = useState('')
+  async function restoreLink() {
+    try {
+      const d = decodeRestore(link)
+      if (!d) { toast('Plak hier de hele herstellink.', 'error'); return }
+      const ok = await replaceAll({ ...d, settings: { ...d.settings, setupDone: true } })
+      toast(ok ? 'Je plan is teruggezet' : 'Terugzetten mislukt', ok ? 'ok' : 'error')
+    } catch (e) { toast((e as Error).message, 'error') }
+  }
+
   async function restore(f?: File) {
     if (!f) return
     try {
@@ -73,6 +83,14 @@ export function Setup() {
   return (
     <div className="flex flex-col gap-7 pb-10">
       <PageHeader eyebrow={__OWNER__ ? `Welkom, ${__OWNER__}` : "Welkom bij Finance"} title="Stel je maandplan in" />
+
+      <Section title="Al een plan gemaakt?">
+        <div className="panel flex flex-col gap-3 p-4">
+          <p className="text-[14px] text-muted">Plak je herstellink, dan staat je plan er in één keer weer.</p>
+          <input id="setup-link" className={inputCls} placeholder="https://…#herstel=…" value={link} onChange={(e) => setLink(e.target.value)} autoCapitalize="off" autoCorrect="off" spellCheck={false} />
+          <Button variant="secondary" onClick={() => void restoreLink()} disabled={!link.trim()}>Plan terugzetten</Button>
+        </div>
+      </Section>
       <p className="px-1 text-[15px] text-muted">Dit doe je één keer. Je bedragen worden alleen op dit apparaat bewaard en kun je later altijd aanpassen in Instellingen.</p>
 
       <Section title="Inkomen">
