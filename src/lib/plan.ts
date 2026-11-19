@@ -4,70 +4,46 @@
 import { pad, todayISO } from './dates'
 
 export type PillarId = 'ondernemen' | 'lichaam' | 'geld' | 'geest' | 'communicatie' | 'uitstraling'
-export type PhaseId = 'fase1' | 'fase2' | 'fase3'
+
+/** Soort blok in je agenda. Bepaalt pijler, of het een training is en of je het kunt afvinken. */
+export type Cat = 'werk' | 'school' | 'sport' | 'ion' | 'studie' | 'eigen'
+export const CATS: { id: Cat; label: string; pillar?: PillarId }[] = [
+  { id: 'werk', label: 'Werk' },
+  { id: 'school', label: 'School' },
+  { id: 'sport', label: 'Sport', pillar: 'lichaam' },
+  { id: 'ion', label: 'ION', pillar: 'ondernemen' },
+  { id: 'studie', label: 'Studie' },
+  { id: 'eigen', label: 'Eigen tijd', pillar: 'geest' },
+]
+export const catInfo = (c: Cat) => CATS.find((x) => x.id === c) ?? CATS[CATS.length - 1]
 
 export interface Block {
   id: string
   start: string // "17:15"
   end?: string
   title: string
-  pillar?: PillarId
-  /** Vaste afspraak (werk, school): context, niet af te vinken. */
-  fixed?: boolean
-  /** Training: afvinken telt ook als "Bewegen". */
-  training?: boolean
+  cat: Cat
 }
+/** Werk is context (niet af te vinken); de rest vink je af. Sport telt ook als "Bewegen". */
+export const isFixed = (b: Block) => b.cat === 'werk'
+export const isTraining = (b: Block) => b.cat === 'sport'
+export const blockPillar = (b: Block) => catInfo(b.cat).pillar
 
-export interface Phase { id: PhaseId; name: string; short: string; from: string; note: string; week: Block[][] }
-
-const b = (id: string, start: string, end: string | undefined, title: string, extra: Partial<Block> = {}): Block => ({ id, start, end, title, ...extra })
-const werk = (d: string) => b(`werk-${d}`, '08:30', '17:00', 'Werk', { fixed: true })
-const school = (d: string, s: string, e: string) => b(`school-${d}`, s, e, 'School', { fixed: true })
-const kracht = (d: string) => b(`kracht-${d}`, '17:15', '18:30', 'Kracht', { pillar: 'lichaam', training: true })
-const review = b('review', '19:00', '19:30', 'Weekreview', { pillar: 'geest' })
-const ionZo = b('ion-zo', '10:00', '12:00', 'ION-blok', { pillar: 'ondernemen' })
-
-/** Index 0 = zondag, zoals Date.getDay(). */
-export const PHASES: Phase[] = [
-  {
-    id: 'fase1', name: 'Nu t/m december', short: 'Nu–dec', from: '2000-01-01',
-    note: 'Lichtere variant: voetbal loopt nog, alleen het ritme en de lege plekken vullen.',
-    week: [
-      [ionZo, review],
-      [werk('ma'), b('gym-ma', '17:00', '18:30', 'Gym / voetbal', { pillar: 'lichaam', training: true }), school('ma', '20:00', '22:00')],
-      [school('di', '09:20', '17:00'), b('voetbal-di', '20:00', '22:00', 'Voetbal', { pillar: 'lichaam', training: true })],
-      [werk('wo'), b('studie-wo', '19:30', '21:00', 'Studieblok')],
-      [werk('do'), school('do', '19:30', '22:00')],
-      [werk('vr'), school('vr', '20:00', '22:00')],
-      [b('loop-za', '08:30', '09:30', 'Rustige duurloop', { pillar: 'lichaam', training: true }), school('za', '11:00', '13:00')],
-    ],
-  },
-  {
-    id: 'fase2', name: 'Januari t/m zomer 2027', short: 'Jan–zomer', from: '2027-01-01',
-    note: 'Je standaardweek: geen voetbal, opleiding loopt. Bij deadlines wint school van ION.',
-    week: [
-      [ionZo, review],
-      [werk('ma'), kracht('ma'), school('ma', '20:00', '22:00')],
-      [b('loop-di', '07:00', '07:45', 'Hardlopen', { pillar: 'lichaam', training: true }), school('di', '09:20', '17:00'), b('ion-di', '20:00', '21:30', 'ION-blok', { pillar: 'ondernemen' })],
-      [werk('wo'), kracht('wo'), b('studie-wo', '19:30', '21:00', 'Studieblok')],
-      [werk('do'), school('do', '19:30', '22:00')],
-      [werk('vr'), kracht('vr'), school('vr', '20:00', '22:00')],
-      [b('loop-za', '08:30', '09:30', 'Lange duurloop', { pillar: 'lichaam', training: true }), school('za', '11:00', '13:00')],
-    ],
-  },
-  {
-    id: 'fase3', name: 'Na de opleiding', short: 'Na opleiding', from: '2027-07-01',
-    note: 'De schooltijd schuift grotendeels naar ION, ongeveer 10 uur per week.',
-    week: [
-      [ionZo, review],
-      [werk('ma'), kracht('ma'), b('ion-ma', '19:30', '21:30', 'ION-blok', { pillar: 'ondernemen' })],
-      [b('loop-di', '06:45', '07:30', 'Hardlopen', { pillar: 'lichaam', training: true }), werk('di'), b('ion-di', '20:00', '21:30', 'ION-blok', { pillar: 'ondernemen' })],
-      [werk('wo'), kracht('wo'), b('lezen-wo', '19:30', '20:30', 'Lezen en communicatie', { pillar: 'communicatie' })],
-      [b('loop-do', '07:00', '07:45', 'Hardlopen', { pillar: 'lichaam', training: true }), werk('do'), b('ion-do', '19:30', '21:30', 'ION-blok', { pillar: 'ondernemen' })],
-      [werk('vr'), kracht('vr'), b('vrij-vr', '19:00', undefined, 'Vrije avond', { fixed: true })],
-      [b('loop-za', '08:30', '09:30', 'Lange duurloop', { pillar: 'lichaam', training: true }), b('ion-za', '10:30', '12:30', 'ION-blok', { pillar: 'ondernemen' })],
-    ],
-  },
+const bl = (id: string, start: string, end: string | undefined, title: string, cat: Cat): Block => ({ id, start, end, title, cat })
+const workday = (d: string): Block[] => [
+  bl(`${d}-werk`, '08:30', '17:00', 'Werk', 'werk'),
+  bl(`${d}-sport`, '17:15', '18:30', 'Sporten', 'sport'),
+  bl(`${d}-avond`, '19:30', '21:30', 'ION of school', 'ion'),
+]
+/** Startweek (index 0 = zondag, zoals Date.getDay()). Alles is in de app aan te passen. */
+export const DEFAULT_WEEK: Block[][] = [
+  [bl('zo-ion', '10:00', '12:00', 'ION-blok', 'ion'), bl('zo-review', '19:00', '19:30', 'Weekreview', 'eigen')],
+  workday('ma'),
+  [bl('di-school', '09:30', '17:00', 'School', 'school'), bl('di-sport', '17:30', '18:30', 'Sporten', 'sport'), bl('di-avond', '19:30', '21:30', 'ION of school', 'ion')],
+  workday('wo'),
+  workday('do'),
+  workday('vr'),
+  [bl('za-loop', '08:30', '09:30', 'Lange duurloop', 'sport'), bl('za-school', '11:00', '13:00', 'School', 'school')],
 ]
 
 export interface Habit { id: string; title: string; hint: string; pillar: PillarId }
@@ -105,12 +81,15 @@ export interface PlanData {
   metrics: Partial<Record<PillarId, number>>
   /** Eigen tekst voor het jaardoel, als je die aanpast. */
   goals: Partial<Record<PillarId, string>>
-  phase: 'auto' | PhaseId
+  /** Jouw vaste week (aangepast in de app). Leeg = startweek. */
+  week?: Block[][]
+  /** Aanpassingen voor één specifieke dag (datum → blokken van die dag). */
+  overrides: Record<string, Block[]>
   /** Weekreview per week (sleutel = datum van de maandag). */
   reviews: Record<string, { done: number[]; note: string }>
 }
 
-export const emptyPlan = (): PlanData => ({ v: 1, days: {}, metrics: {}, goals: {}, phase: 'auto', reviews: {} })
+export const emptyPlan = (): PlanData => ({ v: 1, days: {}, metrics: {}, goals: {}, overrides: {}, reviews: {} })
 
 export const REVIEW_QUESTIONS = [
   'Hoeveel trainingen gedaan? Enkels oké?',
@@ -130,19 +109,40 @@ export function weekDays(iso: string): string[] { const s = weekStart(iso); retu
 export const toMinutes = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
 export const nowHHMM = (d = new Date()) => `${pad(d.getHours())}:${pad(d.getMinutes())}`
 
-/* ---------- fase en planning ---------- */
-export function autoPhase(iso: string): PhaseId {
-  let id: PhaseId = 'fase1'
-  for (const p of PHASES) if (iso >= p.from) id = p.id
-  return id
+/* ---------- planning ---------- */
+export const weekTemplate = (p: PlanData): Block[][] => (p.week && p.week.length === 7 ? p.week : DEFAULT_WEEK)
+const sortBlocks = (list: Block[]) => [...list].sort((a, z) => toMinutes(a.start) - toMinutes(z.start))
+export function blocksFor(p: PlanData, iso: string): Block[] {
+  return sortBlocks(p.overrides?.[iso] ?? weekTemplate(p)[parseISO(iso).getDay()])
 }
-export function phaseFor(plan: PlanData, iso: string): Phase {
-  const id = plan.phase === 'auto' ? autoPhase(iso) : plan.phase
-  return PHASES.find((p) => p.id === id)!
+export const isOverridden = (p: PlanData, iso: string) => !!p.overrides?.[iso]
+export const newBlockId = () => 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+
+const upsert = (list: Block[], b: Block) => (list.some((x) => x.id === b.id) ? list.map((x) => (x.id === b.id ? b : x)) : [...list, b])
+
+/** Blok opslaan: alleen voor deze dag, of voor deze weekdag in elke week. */
+export function saveBlock(p: PlanData, iso: string, b: Block, scope: 'dag' | 'week'): PlanData {
+  if (scope === 'dag') return { ...p, overrides: { ...p.overrides, [iso]: sortBlocks(upsert(blocksFor(p, iso), b)) } }
+  const dow = parseISO(iso).getDay()
+  const week = weekTemplate(p).map((day, i) => (i === dow ? sortBlocks(upsert(day, b)) : day))
+  const overrides = { ...p.overrides }
+  if (overrides[iso]) overrides[iso] = sortBlocks(upsert(overrides[iso], b))
+  return { ...p, week, overrides }
 }
-export function blocksFor(plan: PlanData, iso: string): Block[] {
-  return [...phaseFor(plan, iso).week[parseISO(iso).getDay()]].sort((a, z) => toMinutes(a.start) - toMinutes(z.start))
+export function deleteBlock(p: PlanData, iso: string, id: string, scope: 'dag' | 'week'): PlanData {
+  if (scope === 'dag') return { ...p, overrides: { ...p.overrides, [iso]: blocksFor(p, iso).filter((x) => x.id !== id) } }
+  const dow = parseISO(iso).getDay()
+  const overrides = { ...p.overrides }
+  if (overrides[iso]) overrides[iso] = overrides[iso].filter((x) => x.id !== id)
+  return { ...p, week: weekTemplate(p).map((day, i) => (i === dow ? day.filter((x) => x.id !== id) : day)), overrides }
 }
+/** Dag terug naar je vaste week. */
+export function resetDay(p: PlanData, iso: string): PlanData {
+  const overrides = { ...p.overrides }
+  delete overrides[iso]
+  return { ...p, overrides }
+}
+
 /** Het blok dat nu bezig is, anders het eerstvolgende. */
 export function currentBlock(blocks: Block[], hhmm: string): { block: Block; state: 'now' | 'next' } | null {
   const t = toMinutes(hhmm)
@@ -166,7 +166,7 @@ export function toggleHabit(p: PlanData, iso: string, id: string): PlanData {
 export function toggleBlock(p: PlanData, iso: string, block: Block): PlanData {
   const d = day(p, iso)
   const on = !d.b.includes(block.id)
-  const h = on && block.training && !d.h.includes('bewegen') ? [...d.h, 'bewegen'] : d.h
+  const h = on && isTraining(block) && !d.h.includes('bewegen') ? [...d.h, 'bewegen'] : d.h
   return { ...p, days: { ...p.days, [iso]: { h, b: toggle(d.b, block.id) } } }
 }
 
@@ -194,7 +194,7 @@ export function weekScore(p: PlanData, today: string): number {
 export function trainingsThisWeek(p: PlanData, today: string): { done: number; planned: number } {
   let done = 0, planned = 0
   for (const d of weekDays(today)) {
-    const tr = blocksFor(p, d).filter((x) => x.training)
+    const tr = blocksFor(p, d).filter(isTraining)
     planned += tr.length
     done += tr.filter((x) => day(p, d).b.includes(x.id)).length
   }
@@ -234,7 +234,7 @@ export function isValidPlan(x: unknown): x is PlanData {
 export function loadPlan(): PlanData {
   try {
     const raw = localStorage.getItem(KEY)
-    if (raw) { const p = JSON.parse(raw); if (isValidPlan(p)) return { ...emptyPlan(), ...p } }
+    if (raw) { const p = JSON.parse(raw); if (isValidPlan(p)) return { ...emptyPlan(), ...p, overrides: p.overrides ?? {} } }
   } catch { /* geen opslag of kapotte gegevens: begin leeg */ }
   return emptyPlan()
 }

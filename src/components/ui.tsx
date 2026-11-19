@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { euro } from '../lib/money'
 import type { Cents } from '../lib/money'
 import { useStore } from '../store'
@@ -98,7 +99,8 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
     return () => window.removeEventListener('keydown', k)
   }, [open, onClose])
   if (!open) return null
-  return (
+  // Via een portal naar <body>, zodat de sheet altijd boven de navigatiebalk ligt (ook tijdens de paginanimatie).
+  return createPortal(
     <div className="fixed inset-0 z-40 flex items-end justify-center" role="dialog" aria-modal="true" aria-label={title}>
       <div className="absolute inset-0 bg-black/30 anim-fade" onClick={onClose} />
       <div className="relative w-full max-w-[520px] max-h-[92dvh] overflow-y-auto rounded-t-[24px] bg-bg anim-sheet gutter"
@@ -112,7 +114,8 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

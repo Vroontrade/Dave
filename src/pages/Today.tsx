@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Check, Field, List, PageHeader, Pill, Section, Sheet, inputCls } from '../components/ui'
+import { Button, Check, Field, List, PageHeader, Pill, Section, Segmented, Sheet, inputCls } from '../components/ui'
 import { WEEKDAYS, formatDate, todayISO, daysUntil } from '../lib/dates'
 import {
-  HABITS, PHASES, PILLARS, REVIEW_QUESTIONS, autoPhase, blocksFor, currentBlock, dayScore, habitsDone, loadPlan,
-  nextInvestDay, nowHHMM, parseISO, phaseFor, pillarProgress, savePlan, streak, toggleBlock, toggleHabit, trainingsThisWeek,
-  weekDays, weekScore, weekStart, type Block, type Pillar, type PlanData,
+  CATS, HABITS, PILLARS, REVIEW_QUESTIONS, blockPillar, blocksFor, catInfo, currentBlock, dayScore, deleteBlock, habitsDone,
+  isFixed, isOverridden, loadPlan, newBlockId, nextInvestDay, nowHHMM, parseISO, pillarProgress, resetDay, saveBlock, savePlan,
+  streak, toggleBlock, toggleHabit, trainingsThisWeek, weekDays, weekScore, weekStart, weekTemplate,
+  type Block, type Pillar, type PlanData,
 } from '../lib/plan'
 
 const MONTHS = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december']
@@ -47,7 +48,7 @@ export function TodayPage() {
   const [pillar, setPillar] = useState<Pillar | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [weekOpen, setWeekOpen] = useState(false)
-  const [phaseOpen, setPhaseOpen] = useState(false)
+  const [edit, setEdit] = useState<EditState | null>(null)
   const [saveError, setSaveError] = useState(false)
 
   useEffect(() => { setSaveError(!savePlan(plan)) }, [plan])
@@ -65,7 +66,6 @@ export function TodayPage() {
   const log = plan.days[date] ?? { h: [], b: [] }
   const done = habitsDone(plan, date)
   const cur = isToday ? currentBlock(blocks, nowHHMM(now)) : null
-  const phase = phaseFor(plan, date)
   const st = streak(plan, today)
   const ws = weekScore(plan, today)
   const tr = trainingsThisWeek(plan, today)
@@ -79,7 +79,7 @@ export function TodayPage() {
   return (
     <div className="flex flex-col gap-7">
       <PageHeader eyebrow={longDate(today)} title={`${greeting(now.getHours())}, Dave`} right={
-        <button type="button" onClick={() => setPhaseOpen(true)} className="mb-1 shrink-0 whitespace-nowrap rounded-full bg-surface px-3.5 py-2 text-[14px] shadow-sm active:bg-sunken" aria-label={`Fase: ${phase.name}. Wijzigen`}>{phase.short}</button>
+        <button type="button" onClick={() => setWeekOpen(true)} className="mb-1 shrink-0 whitespace-nowrap rounded-full bg-surface px-3.5 py-2 text-[14px] shadow-sm active:bg-sunken">Mijn week</button>
       } />
       {saveError && <div className="rounded-xl bg-warning-soft px-3 py-2 text-[13px] text-warning">Opslaan lukt hier niet. Je vinkjes blijven staan tot je de app sluit.</div>}
 
@@ -153,13 +153,23 @@ export function TodayPage() {
       </Section>
 
       {/* Dagplanning uit de standaardweek */}
-      <Section title={isToday ? 'Planning vandaag' : 'Planning'} action={<button type="button" className="text-[13px] text-muted" onClick={() => setWeekOpen(true)}>Hele week</button>}>
+      <Section title={isToday ? 'Planning vandaag' : 'Planning'} action={<button type="button" className="text-[13px] text-muted" onClick={() => setWeekOpen(true)}>Mijn week</button>}>
         <List>
           <TimeRow time="06:30" title="Opstaan" muted />
-          {blocks.map((bl) => <BlockRow key={bl.id} block={bl} on={log.b.includes(bl.id)} active={cur?.state === 'now' && cur.block.id === bl.id} onToggle={() => setPlan((p) => toggleBlock(p, date, bl))} />)}
+          {blocks.map((bl) => <BlockRow key={bl.id} block={bl} on={log.b.includes(bl.id)} active={cur?.state === 'now' && cur.block.id === bl.id}
+            onToggle={() => setPlan((p) => toggleBlock(p, date, bl))} onEdit={() => setEdit({ block: bl, date, isNew: false, scope: 'dag' })} />)}
+          <button type="button" onClick={() => setEdit({ block: { id: newBlockId(), start: '19:30', end: '21:00', title: '', cat: 'ion' }, date, isNew: true, scope: 'dag' })}
+            className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2.5 text-left text-[14px] text-muted active:bg-sunken">
+            <span className="w-[86px] shrink-0 text-center text-[18px] leading-none" aria-hidden>+</span>Blok toevoegen
+          </button>
           <TimeRow time="22:00" title="Schermen weg, afbouwen" muted />
           <TimeRow time="23:00" title="Slapen" muted />
         </List>
+        <p className="px-1 text-[13px] text-muted">
+          {isOverridden(plan, date)
+            ? <>Deze dag wijkt af van je vaste week. <button type="button" className="underline underline-offset-2" onClick={() => setPlan((p) => resetDay(p, date))}>Terug naar vaste week</button></>
+            : 'Tik op een blok om het aan te passen, voor deze dag of voor elke week.'}
+        </p>
       </Section>
 
       {/* Weekreview */}
@@ -195,27 +205,11 @@ export function TodayPage() {
 
       <PillarSheet pillar={pillar} plan={plan} today={today} onClose={() => setPillar(null)} onSave={(fn) => setPlan(fn)} />
       <ReviewSheet open={reviewOpen} plan={plan} weekKey={reviewKey} today={today} onClose={() => setReviewOpen(false)} onSave={(fn) => setPlan(fn)} />
-      <WeekSheet open={weekOpen} plan={plan} date={date} onClose={() => setWeekOpen(false)} />
-      <Sheet open={phaseOpen} onClose={() => setPhaseOpen(false)} title="Welke week geldt nu">
-        <div className="flex flex-col gap-3">
-          <p className="text-[14px] text-muted">Standaard wisselt de app vanzelf: in januari naar de standaardweek, vanaf juli 2027 naar de week na je opleiding.</p>
-          <List>
-            {(['auto', ...PHASES.map((p) => p.id)] as const).map((id) => {
-              const ph = PHASES.find((p) => p.id === id)
-              const label = ph ? ph.name : `Automatisch (nu: ${PHASES.find((p) => p.id === autoPhase(today))!.name.toLowerCase()})`
-              return (
-                <button key={id} type="button" onClick={() => { setPlan((p) => ({ ...p, phase: id })); setPhaseOpen(false) }} className="flex min-h-[52px] w-full items-center gap-3 px-4 py-3 text-left active:bg-sunken">
-                  <Check on={plan.phase === id} />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[15px]">{label}</div>
-                    {ph && <div className="text-[13px] text-muted">{ph.note}</div>}
-                  </div>
-                </button>
-              )
-            })}
-          </List>
-        </div>
-      </Sheet>
+      <WeekSheet open={weekOpen && !edit} plan={plan} date={date} onClose={() => setWeekOpen(false)}
+        onEdit={(block, d, isNew) => setEdit({ block, date: d, isNew, scope: 'week' })} onReset={() => setPlan((p) => ({ ...p, week: undefined }))} />
+      <BlockSheet edit={edit} onClose={() => setEdit(null)}
+        onSave={(b, scope) => { setPlan((p) => saveBlock(p, edit!.date, b, scope)); setEdit(null) }}
+        onDelete={(scope) => { setPlan((p) => deleteBlock(p, edit!.date, edit!.block.id, scope)); setEdit(null) }} />
     </div>
   )
 }
@@ -229,22 +223,79 @@ function TimeRow({ time, title, muted }: { time: string; title: string; muted?: 
   )
 }
 
-function BlockRow({ block, on, active, onToggle }: { block: Block; on: boolean; active: boolean; onToggle: () => void }) {
-  const time = <span className="num w-[86px] shrink-0 text-[13px] text-muted">{block.start}{block.end ? `–${block.end}` : ''}</span>
-  const title = (
-    <div className="min-w-0 flex-1">
-      <div className={'flex items-center gap-2 truncate text-[15px] ' + (block.fixed ? 'text-muted' : 'font-medium')}>
-        {block.title}
-        {active && <Pill tone="success">nu</Pill>}
-      </div>
-      {block.pillar && <div className="text-[12px] text-muted">{PILLARS.find((p) => p.id === block.pillar)!.name}</div>}
+const timeLabel = (b: Block) => `${b.start}${b.end ? `–${b.end}` : ''}`
+
+function BlockRow({ block, on, active, onToggle, onEdit }: { block: Block; on: boolean; active: boolean; onToggle: () => void; onEdit: () => void }) {
+  const fixed = isFixed(block)
+  const pillar = blockPillar(block)
+  return (
+    <div className="flex min-h-[52px] items-center">
+      <button type="button" onClick={onEdit} aria-label={`Bewerken: ${block.title}`} className="flex min-h-[52px] min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-left transition-colors active:bg-sunken">
+        <span className="num w-[86px] shrink-0 text-[13px] text-muted">{timeLabel(block)}</span>
+        <div className="min-w-0 flex-1">
+          <div className={'flex items-center gap-2 truncate text-[15px] ' + (fixed ? 'text-muted' : 'font-medium')}>
+            {block.title}
+            {active && <Pill tone="success">nu</Pill>}
+          </div>
+          {catInfo(block.cat).label !== block.title && <div className="text-[12px] text-muted">{catInfo(block.cat).label}{pillar && pillar !== 'geest' && catInfo(block.cat).label !== PILLARS.find((p) => p.id === pillar)!.name ? ` · ${PILLARS.find((p) => p.id === pillar)!.name}` : ''}</div>}
+        </div>
+      </button>
+      {fixed ? <span className="w-4" /> : (
+        <button type="button" onClick={onToggle} aria-pressed={on} aria-label={`${on ? 'Ongedaan maken' : 'Afvinken'}: ${block.title}`} className="grid h-[52px] w-14 shrink-0 place-items-center">
+          <Check on={on} />
+        </button>
+      )}
     </div>
   )
-  if (block.fixed) return <div className="flex min-h-[52px] items-center gap-3 px-4 py-3">{time}{title}</div>
+}
+
+interface EditState { block: Block; date: string; isNew: boolean; scope: 'dag' | 'week' }
+
+/** Blok toevoegen of aanpassen: soort, titel, tijd, en of het voor één dag of elke week geldt. */
+type BlockSheetProps = { edit: EditState | null; onClose: () => void; onSave: (b: Block, scope: 'dag' | 'week') => void; onDelete: (scope: 'dag' | 'week') => void }
+function BlockSheet(props: BlockSheetProps) {
+  // Nieuwe sleutel per blok, zodat het formulier altijd met de juiste gegevens begint.
+  return props.edit ? <BlockForm key={`${props.edit.block.id}:${props.edit.scope}:${props.edit.date}`} {...props} edit={props.edit} /> : null
+}
+function BlockForm({ edit, onClose, onSave, onDelete }: BlockSheetProps & { edit: EditState }) {
+  const [b, setB] = useState<Block>(edit.block)
+  const [scope, setScope] = useState<'dag' | 'week'>(edit.scope)
+  const [err, setErr] = useState('')
+  const fromWeek = edit.scope === 'week'
+  const d = parseISO(edit.date)
+  const dayName = WEEKDAYS[d.getDay()]
+  const pickCat = (cat: Block['cat']) => setB((x) => ({ ...x, cat, title: !x.title || x.title === catInfo(x.cat).label || x.title === 'ION of school' ? catInfo(cat).label : x.title }))
+  const save = () => {
+    if (!/^\d{2}:\d{2}$/.test(b.start)) { setErr('Vul een begintijd in.'); return }
+    if (b.end && b.end <= b.start) { setErr('De eindtijd moet na de begintijd liggen.'); return }
+    onSave({ ...b, title: b.title.trim() || catInfo(b.cat).label, end: b.end || undefined }, scope)
+  }
   return (
-    <button type="button" onClick={onToggle} aria-pressed={on} aria-label={`${on ? 'Ongedaan maken' : 'Afvinken'}: ${block.title}`} className="flex min-h-[52px] w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-sunken">
-      {time}{title}<Check on={on} />
-    </button>
+    <Sheet open onClose={onClose} title={edit.isNew ? 'Blok toevoegen' : 'Blok aanpassen'}>
+      <div className="flex flex-col gap-5">
+        <Field label="Soort">
+          <div className="flex flex-wrap gap-2">
+            {CATS.map((c) => (
+              <button key={c.id} type="button" onClick={() => pickCat(c.id)} aria-pressed={b.cat === c.id}
+                className={'min-h-[40px] rounded-full px-4 text-[14px] font-medium transition-colors ' + (b.cat === c.id ? 'bg-accent text-accent-ink' : 'bg-sunken text-ink')}>{c.label}</button>
+            ))}
+          </div>
+        </Field>
+        <Field label="Titel"><input id="block-title" className={inputCls} value={b.title} placeholder={catInfo(b.cat).label} onChange={(e) => { const v = e.target.value; setB((x) => ({ ...x, title: v })) }} /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Begin"><input id="block-start" type="time" className={inputCls} value={b.start} onChange={(e) => { const v = e.target.value; setB((x) => ({ ...x, start: v })) }} /></Field>
+          <Field label="Eind"><input id="block-end" type="time" className={inputCls} value={b.end ?? ''} onChange={(e) => { const v = e.target.value; setB((x) => ({ ...x, end: v })) }} /></Field>
+        </div>
+        {fromWeek
+          ? <p className="text-[14px] text-muted">Geldt voor elke {dayName}.</p>
+          : <Field label="Geldt voor">
+              <Segmented value={scope} onChange={setScope} options={[{ value: 'dag', label: `Alleen ${d.getDate()} ${['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'][d.getMonth()]}` }, { value: 'week', label: `Elke ${dayName}` }]} />
+            </Field>}
+        {err && <p className="text-[14px] text-danger" role="alert">{err}</p>}
+        <Button onClick={save}>Opslaan</Button>
+        {!edit.isNew && <Button variant="danger" onClick={() => onDelete(scope)}>{scope === 'week' ? `Verwijderen uit elke ${dayName}` : 'Verwijderen voor deze dag'}</Button>}
+      </div>
+    </Sheet>
   )
 }
 
@@ -328,28 +379,34 @@ function ReviewSheet({ open, plan, weekKey, today, onClose, onSave }: { open: bo
   )
 }
 
-function WeekSheet({ open, plan, date, onClose }: { open: boolean; plan: PlanData; date: string; onClose: () => void }) {
-  const phase = phaseFor(plan, date)
+function WeekSheet({ open, plan, date, onClose, onEdit, onReset }: { open: boolean; plan: PlanData; date: string; onClose: () => void; onEdit: (b: Block, date: string, isNew: boolean) => void; onReset: () => void }) {
+  const tpl = weekTemplate(plan)
   return (
-    <Sheet open={open} onClose={onClose} title={`Standaardweek · ${phase.short}`}>
+    <Sheet open={open} onClose={onClose} title="Mijn week">
       <div className="flex flex-col gap-5">
-        <p className="text-[14px] text-muted">{phase.note} Elke dag 06:30 op en 23:00 slapen.</p>
-        {weekDays(date).map((d) => (
-          <Section key={d} title={WEEKDAYS[parseISO(d).getDay()]}>
-            <List>
-              {blocksFor(plan, d).map((bl) => (
-                <div key={bl.id} className="flex min-h-[44px] items-center gap-3 px-4 py-2.5">
-                  <span className="num w-[86px] shrink-0 text-[13px] text-muted">{bl.start}{bl.end ? `–${bl.end}` : ''}</span>
-                  <span className={'flex-1 text-[15px] ' + (bl.fixed ? 'text-muted' : 'font-medium')}>{bl.title}</span>
-                  {bl.pillar && <span className="text-[12px] text-muted">{PILLARS.find((p) => p.id === bl.pillar)!.name}</span>}
-                </div>
-              ))}
-            </List>
-          </Section>
-        ))}
-        <Button variant="secondary" onClick={onClose}>Sluiten</Button>
+        <p className="text-[14px] text-muted">Je vaste week. Tik op een blok om het aan te passen; dat geldt dan voor elke week. Elke dag 06:30 op en 23:00 slapen.</p>
+        {weekDays(date).map((d) => {
+          const dow = parseISO(d).getDay()
+          return (
+            <Section key={d} title={WEEKDAYS[dow]}>
+              <List>
+                {[...tpl[dow]].sort((a, z) => a.start.localeCompare(z.start)).map((bl) => (
+                  <button key={bl.id} type="button" onClick={() => onEdit(bl, d, false)} aria-label={`Bewerken: ${WEEKDAYS[dow]} ${bl.title}`} className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2.5 text-left active:bg-sunken">
+                    <span className="num w-[86px] shrink-0 text-[13px] text-muted">{timeLabel(bl)}</span>
+                    <span className={'flex-1 truncate text-[15px] ' + (isFixed(bl) ? 'text-muted' : 'font-medium')}>{bl.title}</span>
+                    <span className="text-[12px] text-muted">{catInfo(bl.cat).label}</span>
+                  </button>
+                ))}
+                <button type="button" onClick={() => onEdit({ id: newBlockId(), start: '19:30', end: '21:00', title: '', cat: 'ion' }, d, true)} className="flex min-h-[44px] w-full items-center gap-3 px-4 py-2 text-left text-[14px] text-muted active:bg-sunken">
+                  <span className="w-[86px] shrink-0 text-center text-[18px] leading-none" aria-hidden>+</span>Blok toevoegen
+                </button>
+              </List>
+            </Section>
+          )
+        })}
+        <Button variant="secondary" onClick={onClose}>Klaar</Button>
+        {plan.week && <button type="button" className="self-center text-[13px] text-muted underline underline-offset-2" onClick={onReset}>Startweek terugzetten</button>}
       </div>
     </Sheet>
   )
 }
-
