@@ -61,7 +61,9 @@ h1, h2, h3 { text-wrap: balance; }
 .anim-sheet { animation: sheet .32s cubic-bezier(.2,.8,.2,1) both; }
 .anim-fade { animation: fade .2s ease both; }
 .bar-fill { transition: width .6s cubic-bezier(.2,.8,.2,1); }
-@media (prefers-reduced-motion: reduce) { .anim-rise, .anim-sheet, .anim-fade { animation: none; } .bar-fill { transition: none; } }
+.bar-h { transition: height .6s cubic-bezier(.2,.8,.2,1); }
+.ring-fill { transition: stroke-dashoffset .6s cubic-bezier(.2,.8,.2,1); }
+@media (prefers-reduced-motion: reduce) { .anim-rise, .anim-sheet, .anim-fade { animation: none; } .bar-fill, .bar-h, .ring-fill { transition: none; } }
 
 .check { width: 26px; height: 26px; border-radius: 999px; border: 1.5px solid var(--line); display: grid; place-items: center; flex: none; transition: background .15s, border-color .15s, transform .15s; }
 .check[data-on="true"] { background: var(--success); border-color: var(--success); color: #fff; }

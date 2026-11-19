@@ -66,7 +66,7 @@ const assert = (c, m) => { if (!c) { console.error('FOUT: ' + m); process.exitCo
   // 4. Bestaande gegevens (van vóór het instelscherm) blijven intact
   const ctx2 = await b.newContext({ ...devices['iPhone 13'] })
   const p2 = await ctx2.newPage()
-  await p2.goto(URL)
+  await p2.goto(URL + '#dashboard')
   await p2.evaluate(() => {
     const legacy = { settings: { version: 1, startMonth: '2026-11', items: [
       { id: 'income', name: 'Salaris', kind: 'income', amount: 300000, dueDay: null, active: true, aliases: ['salaris'] },
@@ -80,5 +80,43 @@ const assert = (c, m) => { if (!c) { console.error('FOUT: ' + m); process.exitCo
   await p2.waitForSelector('text=Nog vrij te besteden')
   const t2 = (await p2.textContent('body')).replace(/ /g, ' ')
   assert(!t2.includes('Stel je maandplan in') && t2.includes('€ 1.500,00') && t2.includes('€ 123,45'), 'Bestaande gegevens: geen instelscherm, bedragen en saldo intact')
+
+  // 5. Vandaag: dagelijks plan (alleen in de versie van Dave), op een vaste datum en tijd
+  const ctx3 = await b.newContext({ ...devices['iPhone 13'] })
+  const p3 = await ctx3.newPage()
+  p3.on('pageerror', (e) => errors.push(String(e)))
+  await p3.clock.install({ time: new Date(2027, 0, 4, 17, 30) }) // maandag 4 januari 2027, 17:30
+  await p3.goto(URL + '#dashboard')
+  await p3.evaluate(() => localStorage.setItem('financial-reset:v1', JSON.stringify({ settings: { version: 1, startMonth: '2027-01', items: [], goal: { target: 0, stretch: 0, targetDate: '2027-12-31' }, milestones: [], reminders: [], notificationsEnabled: false, setupDone: true, updatedAt: new Date().toISOString() }, months: {}, transactions: [], dismissed: [] })))
+  await p3.goto(URL)
+  await p3.waitForSelector('text=Gewoontes vandaag')
+  let t3 = await p3.textContent('body')
+  assert(t3.includes('Goedemiddag, Dave') && t3.includes('maandag 4 januari'), 'Vandaag is het startscherm met begroeting en datum')
+  assert(t3.includes('Kracht') && t3.includes('17:15–18:30') && t3.includes('Jan–zomer'), 'Planning volgt de standaardweek (fase januari t/m zomer)')
+  assert(await p3.isVisible('text=Nu') , 'Toont wat nu bezig is')
+  await p3.click('button[aria-label="Afvinken: Kracht"]')
+  await p3.click('button[aria-label="Afvinken: Op tijd op"]')
+  await p3.click('button[aria-label="Afvinken: Skincare ochtend"]')
+  await p3.click('button[aria-label="Afvinken: Eén ION-taak"]')
+  assert(await p3.isVisible('button[aria-label="Ongedaan maken: Bewegen"]'), 'Training afvinken vinkt ook Bewegen af')
+  await p3.reload()
+  await p3.waitForSelector('text=Gewoontes vandaag')
+  assert(await p3.isVisible('button[aria-label="Ongedaan maken: Eén ION-taak"]'), 'Vinkjes blijven staan na herladen')
+  assert((await p3.textContent('body')).includes('4 van 7'), 'Dagscore telt mee')
+  await p3.click('text=Lichaam >> nth=-1')
+  await p3.fill('#pillar-value', '3,5')
+  await p3.click('button:has-text("Opslaan")')
+  assert((await p3.textContent('body')).includes('3,5 / 10 km'), 'Pijler bijwerken (langste loop)')
+  await p3.screenshot({ path: OUT + '/2-vandaag.png', fullPage: true })
+  assert(!(await p3.isVisible('button[aria-label="Assistent openen"]')), 'Geen Meld-iets-knop over het plan heen')
+  await p3.click('nav >> text=Geld')
+  await p3.waitForSelector('text=Nog vrij te besteden')
+  assert(errors.length === 0, 'Geen JavaScript-fouten op Vandaag' + (errors.length ? ': ' + errors.join(' | ') : ''))
+
+  // 6. Versie van Sophie heeft geen tabblad Vandaag
+  const p4 = await (await b.newContext({ ...devices['iPhone 13'] })).newPage()
+  await p4.goto(URL + 'sophie/')
+  await p4.waitForSelector('text=Stel je maandplan in')
+  assert(!(await p4.textContent('body')).includes('Vandaag') && !(await p4.textContent('body')).includes('Gewoontes'), 'Sophie: geen tabblad Vandaag')
   await b.close()
 })()

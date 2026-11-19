@@ -5,26 +5,32 @@ import { MonthPage } from './pages/Month'
 import { SavingsPage } from './pages/Savings'
 import { TransactionsPage } from './pages/Transactions'
 import { SettingsPage } from './pages/Settings'
+import { TodayPage } from './pages/Today'
 import { Assistant } from './components/Assistant'
 import { Setup } from './pages/Setup'
 import { Toasts } from './components/ui'
 import { dueReminders } from './lib/reminders'
 
-export type Tab = 'dashboard' | 'maand' | 'sparen' | 'transacties' | 'instellingen'
-const TABS: Tab[] = ['dashboard', 'maand', 'sparen', 'transacties', 'instellingen']
+export type Tab = 'vandaag' | 'dashboard' | 'maand' | 'sparen' | 'transacties' | 'instellingen'
+/** Het tabblad Vandaag (dagelijks plan) hoort alleen bij de versie van Dave, niet bij versies met een OWNER (zoals Sophie). */
+const HAS_TODAY = __OWNER__ === ''
+const TABS: Tab[] = HAS_TODAY ? ['vandaag', 'dashboard', 'maand', 'sparen', 'transacties', 'instellingen'] : ['dashboard', 'maand', 'sparen', 'transacties', 'instellingen']
+const HOME: Tab = HAS_TODAY ? 'vandaag' : 'dashboard'
 
 const Icon = ({ d }: { d: ReactNode }) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{d}</svg>
-const NAV: { tab: Tab; label: string; icon: ReactNode }[] = [
-  { tab: 'dashboard', label: 'Dashboard', icon: <Icon d={<><path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 7h6V4h-6z" /></>} /> },
+const NAV_ALL: { tab: Tab; label: string; icon: ReactNode }[] = [
+  { tab: 'vandaag', label: 'Vandaag', icon: <Icon d={<><circle cx="12" cy="12" r="8" /><path d="M8.5 12.2l2.3 2.3 4.7-4.8" /></>} /> },
+  { tab: 'dashboard', label: HAS_TODAY ? 'Geld' : 'Dashboard', icon: <Icon d={<><path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 7h6V4h-6z" /></>} /> },
   { tab: 'maand', label: 'Maand', icon: <Icon d={<><rect x="4" y="5" width="16" height="15" rx="2.5" /><path d="M8 3v4M16 3v4M4 10h16M8.5 14.5l2 2 4-4" /></>} /> },
   { tab: 'sparen', label: 'Sparen', icon: <Icon d={<><path d="M12 20V10M12 10l-4 4M12 10l4 4" /><path d="M5 5h14" /></>} /> },
   { tab: 'transacties', label: 'Transacties', icon: <Icon d={<><path d="M5 7h14M5 12h14M5 17h9" /></>} /> },
   { tab: 'instellingen', label: 'Instellingen', icon: <Icon d={<><circle cx="12" cy="12" r="3" /><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" /></>} /> },
 ]
+const NAV = NAV_ALL.filter((n) => TABS.includes(n.tab))
 
 function readHash(): Tab {
   const h = (typeof location !== 'undefined' ? location.hash.slice(1) : '') as Tab
-  return TABS.includes(h) ? h : 'dashboard'
+  return TABS.includes(h) ? h : HOME
 }
 
 function useNotifications() {
@@ -76,6 +82,7 @@ function Shell() {
         {!ready && <div className="pt-4 text-[13px] text-muted">Gegevens laden…</div>}
         {mode === 'memory' && ready && <div className="mt-3 rounded-xl bg-warning-soft px-3 py-2 text-[13px] text-warning">Opslag is hier niet beschikbaar. Wijzigingen worden niet bewaard.</div>}
         {data.settings.setupDone === false ? (ready ? <Setup /> : null) : <div key={tab} className="anim-rise">
+          {tab === 'vandaag' && <TodayPage />}
           {tab === 'dashboard' && <Dashboard go={go} openAssistant={() => setAssistant(true)} />}
           {tab === 'maand' && <MonthPage />}
           {tab === 'sparen' && <SavingsPage />}
@@ -85,12 +92,12 @@ function Shell() {
       </main>
 
       {/* Assistent-knop, binnen bereik van je duim */}
-      {data.settings.setupDone !== false && <><button type="button" onClick={() => setAssistant(true)} aria-label="Assistent openen"
+      {data.settings.setupDone !== false && <>{tab !== 'vandaag' && <button type="button" onClick={() => setAssistant(true)} aria-label="Assistent openen"
         className="fixed z-30 flex items-center gap-2 rounded-full bg-accent py-3 pl-4 pr-5 text-[15px] font-medium text-accent-ink shadow-lg transition active:scale-95"
         style={{ right: 'max(16px, calc(env(safe-area-inset-right, 0px) + 16px))', bottom: 'calc(84px + env(safe-area-inset-bottom, 0px))' }}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M12 5v14M5 12h14" /></svg>
         Meld iets
-      </button>
+      </button>}
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t hair bg-[color:var(--bg)]/90 backdrop-blur-xl"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', background: 'color-mix(in srgb, var(--bg) 88%, transparent)', paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' }} aria-label="Hoofdmenu">
