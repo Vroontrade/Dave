@@ -241,3 +241,31 @@ export function loadPlan(): PlanData {
 export function savePlan(p: PlanData): boolean {
   try { localStorage.setItem(KEY, JSON.stringify(p)); return true } catch { return false }
 }
+
+/* ---------- agenda-export (.ics) met meldingen ---------- */
+const ICS_DAY = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']
+const icsText = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n')
+const icsTime = (iso: string, hhmm: string) => iso.replace(/-/g, '') + 'T' + hhmm.replace(':', '') + '00'
+
+/** Je vaste week als terugkerende afspraken (elke week), met een melding vooraf. Werk krijgt geen melding.
+ *  Plus elke avond een herinnering om schermen weg te leggen. Tijden zijn lokale tijd van je telefoon. */
+export function weekICS(p: PlanData, now = new Date(), alarmMinutes = 10): { ics: string; count: number } {
+  const today = todayISO(now)
+  const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '')
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Finance//Vandaag//NL', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:Mijn week']
+  let count = 0
+  const nextDate = (dow: number) => { let d = today; while (parseISO(d).getDay() !== dow) d = addDays(d, 1); return d }
+  const event = (uid: string, dow: number, start: string, end: string | undefined, title: string, alarm: boolean, rrule = `FREQ=WEEKLY;BYDAY=${ICS_DAY[dow]}`) => {
+    const d = nextDate(dow)
+    lines.push('BEGIN:VEVENT', `UID:vandaag-${uid}@finance-dave`, `DTSTAMP:${stamp}`, `DTSTART:${icsTime(d, start)}`)
+    lines.push(end ? `DTEND:${icsTime(d, end)}` : 'DURATION:PT15M')
+    lines.push(`RRULE:${rrule}`, `SUMMARY:${icsText(title)}`)
+    if (alarm) lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsText(title)}`, `TRIGGER:-PT${alarmMinutes}M`, 'END:VALARM')
+    lines.push('END:VEVENT')
+    count++
+  }
+  weekTemplate(p).forEach((day, dow) => day.forEach((b) => event(b.id, dow, b.start, b.end, b.title, !isFixed(b))))
+  event('afbouwen', parseISO(today).getDay(), '22:00', '22:15', 'Schermen weg, afbouwen', true, 'FREQ=DAILY')
+  lines.push('END:VCALENDAR')
+  return { ics: lines.join('\r\n') + '\r\n', count }
+}
