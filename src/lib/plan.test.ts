@@ -94,3 +94,21 @@ describe('Herstellink', () => {
     expect(() => decodeRestore('#herstel=abc')).toThrow()
   })
 })
+
+import { weekICS } from './plan'
+describe('Agenda-export', () => {
+  it('zet de vaste week als terugkerende afspraken met meldingen, behalve werk', () => {
+    const p = emptyPlan()
+    const n = weekTemplate(p).reduce((s, d) => s + d.length, 0)
+    const { ics, count } = weekICS(p, new Date(2027, 0, 6, 12))
+    expect(count).toBe(n + 1)
+    expect(ics).toContain('RRULE:FREQ=WEEKLY;BYDAY=MO')
+    expect(ics).toContain('DTSTART:20270111T083000') // eerstvolgende maandag
+    expect(ics).toContain('RRULE:FREQ=DAILY')
+    const werk = ics.split('BEGIN:VEVENT').find((e) => e.includes('UID:vandaag-ma-werk@'))!
+    expect(werk).not.toContain('VALARM')
+    const sport = ics.split('BEGIN:VEVENT').find((e) => e.includes('UID:vandaag-ma-sport@'))!
+    expect(sport).toContain('TRIGGER:-PT10M')
+    expect(ics.split('\r\n').every((l) => l.length <= 75)).toBe(true)
+  })
+})

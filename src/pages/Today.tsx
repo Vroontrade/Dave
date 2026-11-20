@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button, Check, Field, List, PageHeader, Pill, Section, Segmented, Sheet, inputCls } from '../components/ui'
 import { WEEKDAYS, formatDate, todayISO, daysUntil } from '../lib/dates'
+import { offerFile } from '../lib/exporters'
+import { useStore } from '../store'
 import {
   CATS, HABITS, PILLARS, REVIEW_QUESTIONS, blockPillar, blocksFor, catInfo, currentBlock, dayScore, deleteBlock, habitsDone,
   isFixed, isOverridden, loadPlan, newBlockId, nextInvestDay, nowHHMM, parseISO, pillarProgress, resetDay, saveBlock, savePlan,
-  streak, toggleBlock, toggleHabit, trainingsThisWeek, weekDays, weekScore, weekStart, weekTemplate,
+  streak, toggleBlock, toggleHabit, trainingsThisWeek, weekDays, weekICS, weekScore, weekStart, weekTemplate,
   type Block, type Pillar, type PlanData,
 } from '../lib/plan'
 
@@ -381,10 +383,22 @@ function ReviewSheet({ open, plan, weekKey, today, onClose, onSave }: { open: bo
 
 function WeekSheet({ open, plan, date, onClose, onEdit, onReset }: { open: boolean; plan: PlanData; date: string; onClose: () => void; onEdit: (b: Block, date: string, isNew: boolean) => void; onReset: () => void }) {
   const tpl = weekTemplate(plan)
+  const { toast } = useStore()
+  async function toCalendar() {
+    const { ics, count } = weekICS(plan)
+    const r = await offerFile('mijn-week.ics', ics, 'text/calendar')
+    if (r === 'failed') toast('Het bestand kon niet worden aangeboden.', 'error')
+    else toast(`${count} vaste afspraken klaargezet. Kies Agenda en voeg ze toe.`)
+  }
   return (
     <Sheet open={open} onClose={onClose} title="Mijn week">
       <div className="flex flex-col gap-5">
         <p className="text-[14px] text-muted">Je vaste week. Tik op een blok om het aan te passen; dat geldt dan voor elke week. Elke dag 06:30 op en 23:00 slapen.</p>
+        <div className="flex flex-col gap-2 panel p-4">
+          <p className="text-[15px] font-medium">Meldingen op je telefoon</p>
+          <p className="text-[13px] text-muted">Zet je vaste week in de agenda van je iPhone. Je krijgt dan 10 minuten van tevoren een melding, ook als de app dicht is. Werk krijgt geen melding. Pas je de week aan, verwijder dan de oude afspraken en zet hem opnieuw in je agenda.</p>
+          <Button onClick={toCalendar}>Zet in mijn agenda</Button>
+        </div>
         {weekDays(date).map((d) => {
           const dow = parseISO(d).getDay()
           return (
